@@ -9,6 +9,7 @@
         android:id="@+id/camera_preview"
         android:layout_width="match_parent"
         android:layout_height="200dp"
-        app:zxing_preview_scaling_strategy="fitCenter"/>
+        app:framing_color="@color/colorAccent"
+        app:use_texture_view="false"/>
 
 </RelativeLayout>

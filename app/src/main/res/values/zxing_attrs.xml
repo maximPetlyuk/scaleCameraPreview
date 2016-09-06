@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+  <declare-styleable name="scale_camera">
+    <attr name="framing_color" format="color" />
+    <attr name="framing_rect_width" format="dimension" />
+    <attr name="framing_rect_height" format="dimension" />
+    <attr name="use_texture_view" format="boolean" />
+    <attr name="preview_scaling_strategy" format="enum">
+      <enum name="centerCrop" value="1" />
+      <enum name="fitCenter" value="2" />
+      <enum name="fitXY" value="3" />
+    </attr>
+  </declare-styleable>
+
+</resources>

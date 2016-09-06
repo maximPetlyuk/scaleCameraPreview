@@ -11,9 +11,11 @@ import com.onix.scalecamerapreview.models.Size;
 import com.onix.scalecamerapreview.utils.DisplayConfiguration;
 import com.onix.scalecamerapreview.utils.Util;
 
+import java.util.List;
+
 /**
  * Manage a camera instance using a background thread.
- *
+ * <p/>
  * All methods must be called from the main thread.
  */
 public class CameraInstance {
@@ -27,10 +29,11 @@ public class CameraInstance {
     private DisplayConfiguration displayConfiguration;
     private boolean open = false;
     private CameraSettings cameraSettings = new CameraSettings();
+    private int previewSizeIndex;
 
     /**
      * Construct a new CameraInstance.
-     *
+     * <p/>
      * A new CameraManager is created.
      *
      * @param context the Android Context
@@ -102,9 +105,8 @@ public class CameraInstance {
     }
 
     /**
-     *
      * @return the camera rotation relative to display rotation, in degrees. Typically 0 if the
-     *    display is in landscape orientation.
+     * display is in landscape orientation.
      */
     public int getCameraRotation() {
         return cameraManager.getCameraRotation();
@@ -118,9 +120,10 @@ public class CameraInstance {
         cameraThread.incrementAndEnqueue(opener);
     }
 
-    public void configureCamera() {
+    public void configureCamera(int previewSizeIndex) {
         Util.validateMainThread();
         validateOpen();
+        this.previewSizeIndex = previewSizeIndex;
 
         cameraThread.enqueue(configure);
     }
@@ -195,7 +198,7 @@ public class CameraInstance {
         public void run() {
             try {
                 Log.d(TAG, "Configuring camera");
-                cameraManager.configure();
+                cameraManager.configure(previewSizeIndex);
                 if (readyHandler != null) {
                     readyHandler.obtainMessage(R.id.zxing_prewiew_size_ready, getPreviewSize()).sendToTarget();
                 }
@@ -243,7 +246,7 @@ public class CameraInstance {
 
     /**
      * Returns the CameraManager used to control the camera.
-     *
+     * <p/>
      * The CameraManager is not thread-safe, and must only be used from the CameraThread.
      *
      * @return the CameraManager used
@@ -253,7 +256,6 @@ public class CameraInstance {
     }
 
     /**
-     *
      * @return the CameraThread used to manage the camera
      */
     protected CameraThread getCameraThread() {
@@ -261,10 +263,13 @@ public class CameraInstance {
     }
 
     /**
-     *
      * @return the surface om which the preview is displayed
      */
     protected CameraSurface getSurface() {
         return surface;
+    }
+
+    public List<Size> getSupportedPreviewSizes() {
+        return CameraManager.getPreviewSizes(getCameraManager().getDefaultCameraParameters());
     }
 }

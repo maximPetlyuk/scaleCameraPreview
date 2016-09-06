@@ -30,6 +30,7 @@ import com.onix.scalecamerapreview.scale_strategy.FitCenterStrategy;
 import com.onix.scalecamerapreview.scale_strategy.FitXYStrategy;
 import com.onix.scalecamerapreview.scale_strategy.PreviewScalingStrategy;
 import com.onix.scalecamerapreview.utils.DisplayConfiguration;
+import com.onix.scalecamerapreview.utils.Logger;
 import com.onix.scalecamerapreview.utils.Util;
 
 import java.util.ArrayList;
@@ -97,6 +98,8 @@ public class CameraPreview extends ViewGroup {
     private TextureView textureView;
 
     private boolean previewActive = false;
+
+    private int indexOfPreviewSize;
 
     private RotationListener rotationListener;
     private int openedOrientation = -1;
@@ -183,6 +186,9 @@ public class CameraPreview extends ViewGroup {
                 return;
             }
             currentSurfaceSize = new Size(width, height);
+
+            Logger.e(this, "currentSurfaceSize \n[width - " + width + ", height - " + height + "]");
+
             startPreviewIfReady();
         }
     };
@@ -191,6 +197,9 @@ public class CameraPreview extends ViewGroup {
         @Override
         public boolean handleMessage(Message message) {
             if (message.what == R.id.zxing_prewiew_size_ready) {
+
+                Logger.e(this, "stateCallback - preview size ready");
+
                 previewSized((Size) message.obj);
                 return true;
             } else if (message.what == R.id.zxing_camera_error) {
@@ -249,6 +258,8 @@ public class CameraPreview extends ViewGroup {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
 
+        Logger.e(this, "onAttachedToWindow");
+
         setupSurfaceView();
     }
 
@@ -285,6 +296,10 @@ public class CameraPreview extends ViewGroup {
         styledAttributes.recycle();
     }
 
+    public void setPreviewSizeIndex(int index) {
+        this.indexOfPreviewSize = index;
+    }
+
     private void rotationChanged() {
         // Confirm that it did actually change
         if (isActive() && getDisplayRotation() != openedOrientation) {
@@ -300,9 +315,6 @@ public class CameraPreview extends ViewGroup {
             addView(textureView);
         } else {
             surfaceView = new SurfaceView(getContext());
-            if (Build.VERSION.SDK_INT < 11) {
-                surfaceView.getHolder().setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-            }
             surfaceView.getHolder().addCallback(surfaceCallback);
             addView(surfaceView);
         }
@@ -400,12 +412,9 @@ public class CameraPreview extends ViewGroup {
         if (cameraInstance != null) {
             if (cameraInstance.getDisplayConfiguration() == null) {
                 displayConfiguration = new DisplayConfiguration(getDisplayRotation(), containerSize);
-
-                Log.e(TAG, getPreviewScalingStrategy().toString());
-
                 displayConfiguration.setPreviewScalingStrategy(getPreviewScalingStrategy());
                 cameraInstance.setDisplayConfiguration(displayConfiguration);
-                cameraInstance.configureCamera();
+                cameraInstance.configureCamera(indexOfPreviewSize);
                 if (torchOn) {
                     cameraInstance.setTorch(torchOn);
                 }
@@ -420,6 +429,14 @@ public class CameraPreview extends ViewGroup {
      */
     public void setPreviewScalingStrategy(PreviewScalingStrategy previewScalingStrategy) {
         this.previewScalingStrategy = previewScalingStrategy;
+    }
+
+    public List<Size> getSupportedPreviewSizes() {
+        if (getCameraInstance() == null || getCameraInstance().getCameraManager() == null) {
+            return null;
+        }
+
+        return getCameraInstance().getSupportedPreviewSizes();
     }
 
     /**
@@ -498,8 +515,8 @@ public class CameraPreview extends ViewGroup {
                 startCameraPreview(new CameraSurface(surfaceView.getHolder()));
             } else if (textureView != null && Build.VERSION.SDK_INT >= 14 && textureView.getSurfaceTexture() != null) {
                 if (previewSize != null) {
-//                    Matrix transform = calculateTextureTransform(new Size(textureView.getWidth(), textureView.getHeight()), previewSize);
-//                    textureView.setTransform(transform);
+                    Matrix transform = calculateTextureTransform(new Size(textureView.getWidth(), textureView.getHeight()), previewSize);
+                    textureView.setTransform(transform);
                 }
 
                 startCameraPreview(new CameraSurface(textureView.getSurfaceTexture()));
@@ -729,16 +746,8 @@ public class CameraPreview extends ViewGroup {
             cameraInstance.startPreview();
             previewActive = true;
 
-            previewStarted();
             fireState.previewStarted();
         }
-    }
-
-    /**
-     * Called when the preview is started. Override this to start decoding work.
-     */
-    protected void previewStarted() {
-
     }
 
     /**

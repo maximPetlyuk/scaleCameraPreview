@@ -31,6 +31,7 @@ import com.onix.scalecamerapreview.utils.AmbientLightManager;
 import com.onix.scalecamerapreview.utils.AutoFocusManager;
 import com.onix.scalecamerapreview.utils.CameraConfigurationUtils;
 import com.onix.scalecamerapreview.utils.DisplayConfiguration;
+import com.onix.scalecamerapreview.utils.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,10 +40,10 @@ import java.util.List;
 /**
  * Wrapper to manage the Camera. This is not thread-safe, and the methods must always be called
  * from the same thread.
- *
- *
+ * <p/>
+ * <p/>
  * Call order:
- *
+ * <p/>
  * 1. setCameraSettings()
  * 2. open(), set desired preview size (any order)
  * 3. configure(), setPreviewDisplay(holder) (any order)
@@ -135,16 +136,16 @@ public final class CameraManager {
 
     /**
      * Configure the camera parameters, including preview size.
-     *
+     * <p/>
      * The camera must be opened before calling this.
-     *
+     * <p/>
      * Must be called from camera thread.
      */
-    public void configure() {
-        if(camera == null) {
+    public void configure(int previewSizeIndex) {
+        if (camera == null) {
             throw new RuntimeException("Camera not open");
         }
-        setParameters();
+        setParameters(previewSizeIndex);
     }
 
     /**
@@ -160,7 +161,7 @@ public final class CameraManager {
 
     /**
      * Asks the camera hardware to begin drawing preview frames to the screen.
-     *
+     * <p/>
      * Must be called from camera thread.
      */
     public void startPreview() {
@@ -176,7 +177,7 @@ public final class CameraManager {
 
     /**
      * Tells the camera to stop drawing preview frames.
-     *
+     * <p/>
      * Must be called from camera thread.
      */
     public void stopPreview() {
@@ -198,7 +199,7 @@ public final class CameraManager {
 
     /**
      * Closes the camera driver if still in use.
-     *
+     * <p/>
      * Must be called from camera thread.
      */
     public void close() {
@@ -212,23 +213,22 @@ public final class CameraManager {
      * @return true if the camera rotation is perpendicular to the current display rotation.
      */
     public boolean isCameraRotated() {
-        if(rotationDegrees == -1) {
+        if (rotationDegrees == -1) {
             throw new IllegalStateException("Rotation not calculated yet. Call configure() first.");
         }
         return rotationDegrees % 180 != 0;
     }
 
     /**
-     *
      * @return the camera rotation relative to display rotation, in degrees. Typically 0 if the
-     *    display is in landscape orientation.
+     * display is in landscape orientation.
      */
     public int getCameraRotation() {
         return rotationDegrees;
     }
 
 
-    private Camera.Parameters getDefaultCameraParameters() {
+    public Camera.Parameters getDefaultCameraParameters() {
         Camera.Parameters parameters = camera.getParameters();
         if (defaultParameters == null) {
             defaultParameters = parameters.flatten();
@@ -238,7 +238,7 @@ public final class CameraManager {
         return parameters;
     }
 
-    private void setDesiredParameters(boolean safeMode) {
+    private void setDesiredParameters(boolean safeMode, int previewSizeIndex) {
         Camera.Parameters parameters = getDefaultCameraParameters();
 
         //noinspection ConstantConditions
@@ -274,14 +274,14 @@ public final class CameraManager {
                     CameraConfigurationUtils.setMetering(parameters);
                 }
             }
-
         }
 
         List<Size> previewSizes = getPreviewSizes(parameters);
         if (previewSizes.size() == 0) {
             requestedPreviewSize = null;
         } else {
-            requestedPreviewSize = displayConfiguration.getBestPreviewSize(previewSizes, isCameraRotated());
+//            requestedPreviewSize = displayConfiguration.getBestPreviewSize(previewSizes, isCameraRotated());
+            requestedPreviewSize = previewSizes.get(previewSizeIndex);
 
             parameters.setPreviewSize(requestedPreviewSize.width, requestedPreviewSize.height);
         }
@@ -297,7 +297,7 @@ public final class CameraManager {
         camera.setParameters(parameters);
     }
 
-    private static List<Size> getPreviewSizes(Camera.Parameters parameters) {
+    public static List<Size> getPreviewSizes(Camera.Parameters parameters) {
         List<Camera.Size> rawSupportedSizes = parameters.getSupportedPreviewSizes();
         List<Size> previewSizes = new ArrayList<>();
         if (rawSupportedSizes == null) {
@@ -349,7 +349,7 @@ public final class CameraManager {
     }
 
 
-    private void setParameters() {
+    private void setParameters(int previewSizeIndex) {
         try {
             this.rotationDegrees = calculateDisplayRotation();
             setCameraDisplayOrientation(rotationDegrees);
@@ -357,11 +357,11 @@ public final class CameraManager {
             Log.w(TAG, "Failed to set rotation.");
         }
         try {
-            setDesiredParameters(false);
+            setDesiredParameters(false, previewSizeIndex);
         } catch (Exception e) {
             // Failed, use safe mode
             try {
-                setDesiredParameters(true);
+                setDesiredParameters(true, previewSizeIndex);
             } catch (Exception e2) {
                 // Well, darn. Give up
                 Log.w(TAG, "Camera rejected even safe-mode parameters! No configuration");
@@ -371,9 +371,13 @@ public final class CameraManager {
         Camera.Size realPreviewSize = camera.getParameters().getPreviewSize();
         if (realPreviewSize == null) {
             previewSize = requestedPreviewSize;
+            Logger.e(this, "setParameters \n" + "realPreviewSize width - " + previewSize.width + ", preview height - " + previewSize.height);
         } else {
             previewSize = new Size(realPreviewSize.width, realPreviewSize.height);
         }
+
+        Logger.e(this, "setParameters \n" + "preview width - " + previewSize.width + ", preview height - " + previewSize.height);
+
         cameraPreviewCallback.setResolution(previewSize);
     }
 
@@ -411,7 +415,7 @@ public final class CameraManager {
 
     /**
      * A single preview frame will be returned to the supplied callback.
-     *
+     * <p/>
      * The thread on which this called is undefined, so a Handler should be used to post the result
      * to the correct thread.
      *
